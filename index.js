@@ -3,6 +3,7 @@ var session = require("express-session");
 var bodyParser = require('body-parser');
 var app = express();
 var bcrypt = require("bcrypt");
+var flash = require("connect-flash");
 
 var db = require('./models');
 
@@ -16,6 +17,11 @@ app.use(session({
     saveUninitialized: true
 }));
 
+app.use(flash());   // requires session, so much be instantiated after session middleware
+                    // adds req.flash() function to be used in any route.
+                    // Calling with params sets message in session; calling without params
+                    // gets from session and deletes from session. Calling mulitple times
+                    // with params before displaying ADDS messages; doesn't overwrite
 
 app.use(function(req, res, next) {
     req.getUser = function() {
@@ -24,9 +30,18 @@ app.use(function(req, res, next) {
     next();
 })
 
+// This is a way of using custom app-level middleware to add property to
+// res object globally.
+app.use('*', function(req, res, next) {
+    var alerts = req.flash();
+    res.locals.alerts = alerts;
+    next();
+});
+
 app.get('/',function(req,res){
+    // res.send(req.flash());
     var user = req.getUser();
-    res.render('index',{user:user});
+    res.render('index',{'user':user});
 });
 
 app.get('/restricted',function(req,res){
@@ -59,12 +74,16 @@ app.post('/auth/login',function(req,res){
                     };
                     res.redirect("/");
                 } else {
-                    res.send("invalid password!");
+                    req.flash('danger', 'Invalid Password!');
+                    res.redirect("/auth/login");
+                    // res.send("invalid password!");
                 }
             })
         } else {
             // error - user not found.
-            res.send("Unknown user.");
+            req.flash('danger', 'Unknown User!');
+            res.redirect("/auth/login");
+            // res.send("Unknown user.");
         }
     });
     //user is logged in forward them to the home page
@@ -90,15 +109,26 @@ app.post('/auth/signup',function(req,res){
         }
     }).spread(function(user, created) {
         if (!created) {
-            res.send('Email already exists in database')
+            req.flash('danger', 'Email already exists in database!');
+            res.redirect("/auth/signup");
+            // res.send('Email already exists in database')
         } else {
-            res.send(user)
+            // res.send(user)
             //user is signed up forward them to the home page
-            // res.redirect('/');
-        }
+            res.redirect('/');
+        };
     }).catch(function(error) {
-        res.send(error);
-    })
+        if (error && Array.isArray(error.errors)) { // <-- Checks error.errors ONLY if error exists AND is an array! Pro Tip!
+            error.errors.forEach(function(errorItem) {
+                req.flash('danger', errorItem.message);
+                console.log('>>>>>>>> ERROR: ', errorItem.message);
+                // console.log('>>>>>>>> ERROR: ', req.flash());
+            });
+        } else {
+            req.flash('danger', 'Unknown error');
+        }
+        res.redirect('/auth/signup');
+    });
     
 });
 
@@ -107,6 +137,7 @@ app.post('/auth/signup',function(req,res){
 app.get('/auth/logout',function(req,res){
     // res.send('logged out');
     delete req.session.user;
+    req.flash('info', 'You have been logged out.') // 2 params: msg-type (bootstrap style), msg-content
     res.redirect('/');
 });
 

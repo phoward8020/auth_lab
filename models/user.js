@@ -4,7 +4,15 @@ var bcrypt = require("bcrypt");
 
 module.exports = function(sequelize, DataTypes) {
   var user = sequelize.define("user", {
-    email: DataTypes.STRING,
+    email: {
+      type: DataTypes.STRING,
+      validate: {
+        isEmail: {
+          args: true,
+          msg: "Your email FAILED our rigorous authentication routine. You suck."
+        }
+      }
+    },
     password: {
         type: DataTypes.STRING,
         validate: {
