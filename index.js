@@ -129,7 +129,6 @@ app.post('/auth/signup',function(req,res){
         }
         res.redirect('/auth/signup');
     });
-    
 });
 
 //logout
